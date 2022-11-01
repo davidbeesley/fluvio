@@ -21,7 +21,6 @@ mod cmd {
     use std::fmt::Debug;
     use std::sync::Arc;
 
-    use k8_client::ClientError;
     use tracing::{debug, trace, instrument};
     use flate2::Compression;
     use flate2::bufread::GzEncoder;
@@ -42,9 +41,9 @@ mod cmd {
         SmartModuleContextData, SmartModuleKind, SmartModuleInvocation, SmartModuleInvocationWasm,
     };
     use fluvio_protocol::record::NO_TIMESTAMP;
-    use fluvio::metadata::tableformat::{TableFormatSpec};
+    use fluvio::metadata::tableformat::TableFormatSpec;
     use fluvio_future::io::StreamExt;
-    use fluvio::{ConsumerConfig, Fluvio, MultiplePartitionConsumer, Offset};
+    use fluvio::{ConsumerConfig, Fluvio, MultiplePartitionConsumer, Offset, FluvioError};
     use fluvio::consumer::{PartitionSelectionStrategy, Record};
     use fluvio_spu_schema::Isolation;
 
@@ -62,7 +61,7 @@ mod cmd {
     use super::super::ClientCmd;
     use super::table_format::{TableEventResponse, TableModel};
 
-    const DEFAULT_TAIL: u32 = 10;
+    const DEFAULT_TAIL: i64 = 10;
     const USER_TEMPLATE: &str = "user_template";
 
     /// Read messages from a topic/partition
@@ -136,7 +135,7 @@ mod cmd {
             value_name = "integer",
             requires("can_be_offset")
         )]
-        pub amount_to_offset: Option<u32>,
+        pub amount_to_offset: Option<i64>,
 
         /// Consume records until end offset (INCLUSIVE)
         #[clap(long, value_name= "integer", conflicts_with_all = &["tail"])]
@@ -335,16 +334,20 @@ mod cmd {
             if let Some(end_offset) = self.end {
                 if end_offset < 0 {
                     eprintln!("Argument end-offset must be greater than or equal to zero");
-                    return Err(ClientError);
+                    return Err(CliError::from(FluvioError::NegativeOffset(
+                        end_offset as i64,
+                    )));
                 }
                 if self.start {
-                    let offset = self.amount_to_offset.unwrap_or(0);
-                    let o = offset as i64;
-                    if end_offset < o {
+                    let start_offset = self.amount_to_offset.unwrap_or(0);
+                    if end_offset < start_offset {
                         eprintln!(
-                            "Argument end-offset must be greater than or equal to specified offset"
+                            "Argument end-offset must be greater than or equal to specified start offset"
                         );
-                        return Err(());
+                        return Err(CliError::from(FluvioError::CrossingOffsets(
+                            end_offset,
+                            start_offset,
+                        )));
                     }
                 }
             }
@@ -375,7 +378,7 @@ mod cmd {
             tableformat: Option<TableFormatSpec>,
         ) -> Result<()> {
             self.print_status();
-            let maybe_potential_offset: Option<i64> = self.end;
+            let maybe_potential_end_offset: Option<i64> = self.end;
             let mut stream = consumer.stream_with_config(offset, config).await?;
 
             let templates = match self.format.as_deref() {
@@ -462,7 +465,7 @@ mod cmd {
                                     &pb,
                                 );
 
-                                if let Some(potential_offset) = maybe_potential_offset {
+                                if let Some(potential_offset) = maybe_potential_end_offset {
                                     if record.offset >= potential_offset {
                                         eprintln!("End-offset has been reached; exiting");
                                         break;
@@ -515,7 +518,7 @@ mod cmd {
                         &pb,
                     );
 
-                    if let Some(potential_offset) = maybe_potential_offset {
+                    if let Some(potential_offset) = maybe_potential_end_offset {
                         if record.offset >= potential_offset {
                             eprintln!("End-offset has been reached; exiting");
                             break;

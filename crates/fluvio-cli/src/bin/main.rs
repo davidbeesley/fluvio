@@ -86,6 +86,41 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_supply_negative_end_offset() {
+        let should_succeed = vec![
+            "fluvio consume --start --end 5 -n 0 hello",
+            "fluvio consume --end 5 hello",
+        ];
+        for s in should_succeed {
+            assert!(parse_succeeds(s), "{s}");
+        }
+
+        let should_not_succeed = vec![
+            "fluvio consume --end -5 hello",
+            "fluvio consume --start --end -5 -n 0 hello",
+        ];
+        for s in should_not_succeed {
+            assert!(!parse_succeeds(s), "{s}");
+        }
+    }
+
+    #[test]
+    fn test_supply_invalid_start_end_offset_pair() {
+        let should_succeed = vec![
+            "fluvio consume --start --end 5 -n 0 hello",
+            "fluvio consume --start --end 5 -n 5 hello",
+        ];
+        for s in should_succeed {
+            assert!(parse_succeeds(s), "{s}");
+        }
+
+        let should_not_succeed = vec!["fluvio consume --start --end 5 -n 6 hello"];
+        for s in should_not_succeed {
+            assert!(!parse_succeeds(s), "{s}");
+        }
+    }
+
     fn parse_succeeds(command: &str) -> bool {
         Root::try_parse_from(command.split_whitespace()).is_ok()
     }

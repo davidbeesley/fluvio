@@ -639,79 +639,53 @@ mod cmd {
             }
         }
 
+        pub(crate) fn format_status_string(&self) -> String {
+            let prefix = format!("Consuming records from '{}'", self.topic);
+            let starting_description = if self.head {
+                // If --from-beginning -n X
+                if let Some(offset) = self.amount_to_offset {
+                    format!(" starting {} from the beginning of log", offset)
+                }
+                // If --from-beginning
+                else {
+                    " starting from the beginning of log".to_string()
+                }
+                // If --offset=X
+            } else if self.start {
+                let offset = self.amount_to_offset.unwrap_or(0);
+                format!(" starting at offset {}", offset)
+            // If --tail or --tail -n X
+            // Joined since default tail != 0
+            } else if self.tail {
+                let tail = self.amount_to_offset.unwrap_or(DEFAULT_TAIL);
+                format!(" starting {} from the end of log", tail,)
+            } else {
+                "".to_string()
+            };
+
+            let ending_description = 
+
+            // If --end-offset=X
+            if let Some(end) = self.end {
+                format!(
+                    " until offset {}",
+                    end
+                )
+            // If no offset config is given, read from the end
+            } else {
+                "".to_string()
+            };
+
+            format!("{}{}{}", prefix, starting_description, ending_description)
+        }
+
         fn print_status(&self) {
             use colored::*;
             if !atty::is(atty::Stream::Stdout) {
                 return;
             }
 
-            if self.head {
-                // If --from-beginning -n X
-                if let Some(offset) = self.amount_to_offset {
-                    eprintln!(
-                        "{}",
-                        format!(
-                            "Consuming records starting {} from the beginning of log for topic '{}'",
-                            offset, &self.topic
-                        )
-                        .bold()
-                    );
-                }
-                // If --from-beginning
-                else {
-                    eprintln!(
-                        "{}",
-                        format!(
-                            "Consuming records from the beginning of log for topic '{}'",
-                            &self.topic
-                        )
-                        .bold()
-                    );
-                }
-                // If --offset=X
-            } else if self.start {
-                let offset = self.amount_to_offset.unwrap_or(0);
-                eprintln!(
-                    "{}",
-                    format!(
-                        "Consuming records from offset {} in topic '{}'",
-                        offset, &self.topic
-                    )
-                    .bold()
-                );
-            // If --tail or --tail -n X
-            // Joined since default tail != 0
-            } else if self.tail {
-                let tail = self.amount_to_offset.unwrap_or(DEFAULT_TAIL);
-                eprintln!(
-                    "{}",
-                    format!(
-                        "Consuming records starting {} from the end of topic '{}'",
-                        tail, &self.topic
-                    )
-                    .bold()
-                );
-            // If --end-offset=X
-            } else if let Some(end) = self.end {
-                eprintln!(
-                    "{}",
-                    format!(
-                        "Consuming records starting from the end until record {} in topic '{}'",
-                        end, &self.topic
-                    )
-                    .bold()
-                );
-            // If no offset config is given, read from the end
-            } else {
-                eprintln!(
-                    "{}",
-                    format!(
-                        "Consuming records from the end of topic '{}'. This will wait for new records",
-                        &self.topic
-                    )
-                    .bold()
-                );
-            }
+            eprintln!("{}", self.format_status_string().bold());
         }
 
         /// Initialize Ctrl-C event handler
@@ -801,5 +775,101 @@ mod cmd {
         fn default() -> Self {
             ConsumeOutputType::dynamic
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ConsumeOpt;
+
+    fn get_opt() -> ConsumeOpt {
+        ConsumeOpt {
+            topic: "TOPIC_NAME".to_string(),
+            partition: Default::default(),
+            all_partitions: Default::default(),
+            disable_continuous: Default::default(),
+            disable_progressbar: Default::default(),
+            key_value: Default::default(),
+            format: Default::default(),
+            table_format: Default::default(),
+            start: Default::default(),
+            head: Default::default(),
+            tail: Default::default(),
+            amount_to_offset: Default::default(),
+            end: Default::default(),
+            max_bytes: Default::default(),
+            suppress_unknown: Default::default(),
+            output: Default::default(),
+            smartmodule: Default::default(),
+            smartmodule_path: Default::default(),
+            aggregate_initial: Default::default(),
+            params: Default::default(),
+            isolation: Default::default(),
+        }
+    }
+    #[test]
+    fn test_format_status_string() {
+        // Starting from options: --head --start --tail
+        // --head
+        let mut opt = get_opt();
+        opt.head = true;
+        assert_eq!(
+            opt.format_status_string(),
+            "Consuming records from 'TOPIC_NAME' starting from the beginning of log",
+        );
+        opt.amount_to_offset = Some(1);
+        assert_eq!(
+            opt.format_status_string(),
+            "Consuming records from 'TOPIC_NAME' starting 1 from the beginning of log",
+        );
+        opt.end = Some(2);
+        assert_eq!(
+            opt.format_status_string(),
+            "Consuming records from 'TOPIC_NAME' starting 1 from the beginning of log until offset 2",
+        );
+
+        // --start
+        let mut opt = get_opt();
+        opt.start = true;
+        assert_eq!(
+            opt.format_status_string(),
+            "Consuming records from 'TOPIC_NAME' starting at offset 0",
+        );
+        opt.amount_to_offset = Some(1);
+        assert_eq!(
+            opt.format_status_string(),
+            "Consuming records from 'TOPIC_NAME' starting at offset 1",
+        );
+        opt.end = Some(2);
+        assert_eq!(
+            opt.format_status_string(),
+            "Consuming records from 'TOPIC_NAME' starting at offset 1 until offset 2",
+        );
+
+        // --tail
+        let mut opt = get_opt();
+        opt.tail = true;
+        opt.amount_to_offset = Some(1);
+        assert_eq!(
+            opt.format_status_string(),
+            "Consuming records from 'TOPIC_NAME' starting 1 from the end of log",
+        );
+        opt.end = Some(2);
+        assert_eq!(
+            opt.format_status_string(),
+            "Consuming records from 'TOPIC_NAME' starting 1 from the end of log until offset 2",
+        );
+
+        // base case
+        let mut opt = get_opt();
+        assert_eq!(
+            "Consuming records from 'TOPIC_NAME'",
+            opt.format_status_string(),
+        );
+        opt.end = Some(2);
+        assert_eq!(
+            "Consuming records from 'TOPIC_NAME' until offset 2",
+            opt.format_status_string(),
+        );
     }
 }

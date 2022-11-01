@@ -138,7 +138,7 @@ mod cmd {
         pub amount_to_offset: Option<i64>,
 
         /// Consume records until end offset (INCLUSIVE)
-        #[clap(long, value_name= "integer", conflicts_with_all = &["tail"])]
+        #[clap(long, value_name = "integer")]
         pub end: Option<i64>,
 
         /// Maximum number of bytes to be retrieved
@@ -663,14 +663,9 @@ mod cmd {
                 "".to_string()
             };
 
-            let ending_description = 
-
             // If --end-offset=X
-            if let Some(end) = self.end {
-                format!(
-                    " until offset {}",
-                    end
-                )
+            let ending_description = if let Some(end) = self.end {
+                format!(" until offset {} (inclusive)", end)
             // If no offset config is given, read from the end
             } else {
                 "".to_string()
@@ -825,7 +820,7 @@ mod tests {
         opt.end = Some(2);
         assert_eq!(
             opt.format_status_string(),
-            "Consuming records from 'TOPIC_NAME' starting 1 from the beginning of log until offset 2",
+            "Consuming records from 'TOPIC_NAME' starting 1 from the beginning of log until offset 2 (inclusive)",
         );
 
         // --start
@@ -843,7 +838,7 @@ mod tests {
         opt.end = Some(2);
         assert_eq!(
             opt.format_status_string(),
-            "Consuming records from 'TOPIC_NAME' starting at offset 1 until offset 2",
+            "Consuming records from 'TOPIC_NAME' starting at offset 1 until offset 2 (inclusive)",
         );
 
         // --tail
@@ -857,7 +852,7 @@ mod tests {
         opt.end = Some(2);
         assert_eq!(
             opt.format_status_string(),
-            "Consuming records from 'TOPIC_NAME' starting 1 from the end of log until offset 2",
+            "Consuming records from 'TOPIC_NAME' starting 1 from the end of log until offset 2 (inclusive)",
         );
 
         // base case
@@ -868,7 +863,7 @@ mod tests {
         );
         opt.end = Some(2);
         assert_eq!(
-            "Consuming records from 'TOPIC_NAME' until offset 2",
+            "Consuming records from 'TOPIC_NAME' until offset 2 (inclusive)",
             opt.format_status_string(),
         );
     }

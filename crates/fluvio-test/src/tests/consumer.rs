@@ -269,7 +269,7 @@ pub fn run(mut test_driver: FluvioTestDriver, mut test_case: TestCase) {
     } else if test_case.option.offset_end {
         Offset::from_end(raw_offset)
     } else {
-        Offset::absolute(raw_offset.into()).expect("Couldn't create absolute offset")
+        Offset::absolute(raw_offset).expect("Couldn't create absolute offset")
     };
 
     if test_case.option.num_setup_records != 0 {

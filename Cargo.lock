@@ -2448,6 +2448,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "fluvio-metrics-cli"
+version = "0.1.0"
+
+[[package]]
 name = "fluvio-package-index"
 version = "0.7.1"
 dependencies = [

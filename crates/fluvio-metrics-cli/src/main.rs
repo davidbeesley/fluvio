@@ -12,6 +12,7 @@ fn main() {
     loop {
         if let Some(m) = collect() {
             let now = Instant::now();
+            // println!("{:?}", m);
             rolling.push_back((now, m));
         }
 
@@ -27,15 +28,18 @@ fn main() {
             let inbound_records_per_sec = (delta.inbound.client.records as f64) / delta_t_secs;
             let outbound_records_per_sec = (delta.outbound.client.records as f64) / delta_t_secs;
 
-            let total_bytes = newest.inbound.client.bytes as f64 / 1_000_000_000.;
-            let total_records = newest.inbound.client.records;
+            let inbound_total_bytes = newest.inbound.client.bytes as f64 / 1_000_000_000.;
+            let inbound_total_records = newest.inbound.client.records;
+            let outbound_total_bytes = newest.outbound.client.bytes as f64 / 1_000_000_000.;
+            let outbound_total_records = newest.outbound.client.records;
 
-            println!("Inbound: {inbound_bytes_per_sec:8.3} kb/s {inbound_records_per_sec:13.0} r/s    Outbound: {outbound_bytes_per_sec:8.3} kb/s {outbound_records_per_sec:13.0} r/s. total ingres: {total_bytes:6.3} gb. Total records: {total_records:15.0}" );
+            println!("Inbound: {inbound_bytes_per_sec:8.3} kb/s {inbound_records_per_sec:13.0} r/s {inbound_total_bytes:6.3} gb {inbound_total_records:15.0} r \
+            Outbound: {outbound_bytes_per_sec:8.3} kb/s {outbound_records_per_sec:13.0} r/s {outbound_total_bytes:6.3} gb {outbound_total_records:15.0} r");
         }
-        if rolling.len() > 30 {
+        if rolling.len() > 6 {
             rolling.pop_front();
         }
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(5));
     }
 }
 
